@@ -23,9 +23,12 @@ class CKWC_Integration extends WC_Integration {
 		// API interaction
 		$this->api_key      = $this->get_option( 'api_key' );
 		$this->subscription = $this->get_option( 'subscription' );
+		// TODO: foreach subscription and membership status, get subscription_wc_*_* option
 
 		// Enabled and when it should take place
 		$this->enabled      = $this->get_option( 'enabled' );
+                $this->enabled_wc_subscriptions      = $this->get_option( 'enabled_wc_subscriptions' );
+                $this->enabled_wc_memberships      = $this->get_option( 'enabled_wc_memberships' );
 		$this->event        = $this->get_option( 'event' );
 
 		// Opt-in field
@@ -46,7 +49,7 @@ class CKWC_Integration extends WC_Integration {
 			add_action( 'save_post_product', array( $this, 'save_product' ) );
 		}
 
-		if ( 'yes' === $this->enabled && 'yes' === $this->display_opt_in ) {
+		if ( ('yes' === $this->enabled || 'yes' === $this->enabled_wc_subscriptions || 'yes' === $this->enabled_wc_memberships) && 'yes' === $this->display_opt_in ) {
 			add_filter( 'woocommerce_checkout_fields', array( $this, 'add_opt_in_checkbox' ) );
 		}
 
@@ -57,6 +60,8 @@ class CKWC_Integration extends WC_Integration {
 			add_action( 'woocommerce_checkout_update_order_meta',  array( $this, 'order_status' ), 99999, 1 );
 			add_action( 'woocommerce_order_status_changed',        array( $this, 'order_status' ), 99999, 3 );
 		}
+
+		//TODO: Add if blocks to add actions for the 2 new enabled_wc_* options and split the if block above to show opt in if any is yesm but add actions for order status only if enabled is yes
 
 	}
 
@@ -464,7 +469,7 @@ class CKWC_Integration extends WC_Integration {
 			}
 		}// End if().
 	}
-
+//TODO: Add 2 new functions to be hooked into subscriptions and memberships status changes
 	/**
 	 * Write API request results to a debug log
 	 * @param $message
