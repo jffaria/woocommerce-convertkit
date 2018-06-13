@@ -92,14 +92,16 @@ class CKWC_Integration extends WC_Integration {
 	 *
 	 */
 	public function init_form_fields() {
+
 		$this->form_fields = array(
+
 			'enabled' => array(
-				'title'       => __( 'Enable/Disable' ),
+				'title'       => __( 'Enable/Disable for orders' ),
 				'type'        => 'checkbox',
-				'label'       => __( 'Enable ConvertKit integration' ),
+				'label'       => __( 'Enable ConvertKit integration for orders' ),
 				'default'     => 'no',
 			),
-
+			
 			'event' => array(
 				'title'       => __( 'Subscribe Event' ),
 				'type'        => 'select',
@@ -111,87 +113,128 @@ class CKWC_Integration extends WC_Integration {
 					'processing' => __( 'Order Processing' ),
 					'completed'  => __( 'Order Completed' ),
 				),
-			),
 
-			'display_opt_in' => array(
-				'title'       => __( 'Display Opt-In Checkbox' ),
-				'label'       => __( 'Display an Opt-In checkbox on checkout' ),
-				'type'        => 'checkbox',
-				'default'     => 'no',
-				'description' => __( 'If enabled, customers will only be subscribed if the "Opt-In" checkbox presented on checkout is checked.' ),
-				'desc_tip'    => false,
-			),
-
-			'opt_in_label' => array(
-				'title'       => __( 'Opt-In Checkbox Label' ),
-				'type'        => 'text',
-				'default'     => __( 'I want to subscribe to the newsletter' ),
-				'description' => __( 'Optional (only used if the above field is checked): Customize the label next to the opt-in checkbox.' ),
-				'desc_tip'    => false,
-			),
-
-			'opt_in_status' => array(
-				'title'       => __( 'Opt-In Checkbox<br />Default Status' ),
-				'type'        => 'select',
-				'default'     => 'checked',
-				'description' => __( 'The default state of the opt-in checkbox' ),
-				'desc_tip'    => false,
-				'options'     => array(
-					'checked'   => __( 'Checked' ),
-					'unchecked' => __( 'Unchecked' ),
-				),
-			),
-
-			'opt_in_location' => array(
-				'title'       => __( 'Opt-In Checkbox<br />Display Location' ),
-				'type'        => 'select',
-				'default'     => 'billing',
-				'description' => __( 'Where to display the opt-in checkbox on the checkout page (under Billing Info or Order Info).' ),
-				'desc_tip'    => false,
-				'options'     => array(
-					'billing' => __( 'Billing' ),
-					'order'   => __( 'Order' ),
-				),
-			),
-
-			'api_key' => array(
-				'title'       => __( 'API Key' ),
-				'type'        => 'text',
-				'default'     => '',
-				// translators: this is a url to the ConvertKit site.
-				'description' => sprintf( __( 'If you already have an account, <a href="%1$s" target="_blank">click here to retrieve your API Key</a>.<br />If you don\'t have a ConvertKit account, you can <a href="%2$s" target="_blank">sign up for one here</a>.' ), esc_attr( esc_html( 'https://app.convertkit.com/account/edit' ) ), esc_attr( esc_url( 'http://convertkit.com/pricing/' ) ) ),
-				'desc_tip'    => false,
 			),
 
 			'subscription' => array(
 				'title'       => __( 'Subscription' ),
 				'type'        => 'subscription',
 				'default'     => '',
-				'description' => __( 'Customers will be added to the selected item' ),
-			),
-
-			'name_format' => array(
-				'title'       => __( 'Name Format' ),
-				'type'        => 'select',
-				'default'     => 'first',
-				'description' => __( 'How should the customer name be sent to ConvertKit?' ),
-				'desc_tip'    => false,
-				'options'     => array(
-					'first'   => __( 'Billing First Name' ),
-					'last'    => __( 'Billing Last Name' ),
-					'both'    => __( 'Billing First Name + Billing Last Name' ),
+				'description' => __( 'Customers that place an order will be added to the selected item' ),
 				),
-			),
 
-			'debug' => array(
-				'title'       => __( 'Debug' ),
-				'type'        => 'checkbox',
-				'label'       => __('Write data to a log file'),
-				'description' => 'You can view the log file by going to WooCommerce > Status, click the Logs tab, then selecting convertkit.',
-				'default'     => 'no',
-			),
 		);
 
+		if( class_exists( 'WC_Subscriptions' ) || class_exists( 'WC_Memberships' ) ) {
+
+			if( class_exists( 'WC_Subscriptions' ) ) {
+
+				$statuses = wcs_get_subscription_statuses();
+
+					$this->form_fields = array_merge( $this->form_fields, array(
+
+						"enabled_wc_subscriptions" => array(
+							'title'		=> __( 'Enable/Disable for WooCommerce Subscriptions' ),
+							'type'		=> 'checkbox',
+							'label'		=> __( 'Enable ConvertKit integration for WooCommerce Subscriptions' ),
+							'default'	=> 'no',
+						), 
+					)
+					);
+
+				foreach( $statuses as $status => $status_label ) {
+					$this->form_fields = array_merge( $this->form_fields, array(
+						"subscription_wc_subscriptions_$status" => array(
+                                			'title'       => __( 'Subscription for ' . $status_label ),
+                                			'type'        => 'subscription',
+                                			'default'     => '',
+			                                'description' => __( 'Customers will be added to the selected item when the subscription becomes ' . $status_label ),
+                         		       ),
+						)
+					);
+				}
+
+			}
+
+			if( class_exists( 'WC_Memberships' ) ) {
+			}
+
+		}
+
+		$this->form_fields = array_merge( $this->form_fields, array(
+				'display_opt_in' => array(
+					'title'       => __( 'Display Opt-In Checkbox' ),
+					'label'       => __( 'Display an Opt-In checkbox on checkout' ),
+					'type'        => 'checkbox',
+					'default'     => 'no',
+					'description' => __( 'If enabled, customers will only be subscribed if the "Opt-In" checkbox presented on checkout is checked.' ),
+					'desc_tip'    => false,
+				),
+
+				'opt_in_label' => array(
+					'title'       => __( 'Opt-In Checkbox Label' ),
+					'type'        => 'text',
+					'default'     => __( 'I want to subscribe to the newsletter' ),
+					'description' => __( 'Optional (only used if the above field is checked): Customize the label next to the opt-in checkbox.' ),
+					'desc_tip'    => false,
+				),
+
+				'opt_in_status' => array(
+					'title'       => __( 'Opt-In Checkbox<br />Default Status' ),
+					'type'        => 'select',
+					'default'     => 'checked',
+					'description' => __( 'The default state of the opt-in checkbox' ),
+					'desc_tip'    => false,
+					'options'     => array(
+						'checked'   => __( 'Checked' ),
+						'unchecked' => __( 'Unchecked' ),
+					),
+				),
+
+				'opt_in_location' => array(
+					'title'       => __( 'Opt-In Checkbox<br />Display Location' ),
+					'type'        => 'select',
+					'default'     => 'billing',
+					'description' => __( 'Where to display the opt-in checkbox on the checkout page (under Billing Info or Order Info).' ),
+					'desc_tip'    => false,
+					'options'     => array(
+						'billing' => __( 'Billing' ),
+						'order'   => __( 'Order' ),
+					),
+				),
+
+				'api_key' => array(
+					'title'       => __( 'API Key' ),
+					'type'        => 'text',
+					'default'     => '',
+					// translators: this is a url to the ConvertKit site.
+					'description' => sprintf( __( 'If you already have an account, <a href="%1$s" target="_blank">click here to retrieve your API Key</a>.<br />If you don\'t have a ConvertKit account, you can <a href="%2$s" target="_blank">sign up for one here</a>.' ), esc_attr( esc_html( 'https://app.convertkit.com/account/edit' ) ), esc_attr( esc_url( 'http://convertkit.com/pricing/' ) ) ),
+					'desc_tip'    => false,
+				),
+
+				'name_format' => array(
+					'title'       => __( 'Name Format' ),
+					'type'        => 'select',
+					'default'     => 'first',
+					'description' => __( 'How should the customer name be sent to ConvertKit?' ),
+					'desc_tip'    => false,
+					'options'     => array(
+						'first'   => __( 'Billing First Name' ),
+						'last'    => __( 'Billing Last Name' ),
+						'both'    => __( 'Billing First Name + Billing Last Name' ),
+					),
+				),
+
+				'debug' => array(
+					'title'       => __( 'Debug' ),
+					'type'        => 'checkbox',
+					'label'       => __('Write data to a log file'),
+					'description' => 'You can view the log file by going to WooCommerce > Status, click the Logs tab, then selecting convertkit.',
+					'default'     => 'no',
+				),
+			)
+		);
+		
 		ob_start();
 		include( 'resources/integration.js' );
 		$code = ob_get_clean();
