@@ -157,6 +157,30 @@ class CKWC_Integration extends WC_Integration {
 			}
 
 			if( class_exists( 'WC_Memberships' ) ) {
+
+                                        $this->form_fields = array_merge( $this->form_fields, array(
+                                                
+                                                "enabled_wc_memberships" => array(
+                                                        'title'         => __( 'Enable/Disable for WooCommerce Memberships' ),
+                                                        'type'          => 'checkbox',
+                                                        'label'         => __( 'Enable ConvertKit integration for WooCommerce Memberships' ),
+                                                        'default'       => 'no',
+                                                ),
+                                        )
+                                        );
+				$statuses = wc_memberships_get_user_membership_statuses();
+				foreach( $statuses as $status => $status_array ) {
+					$status_label = $status_array['label'];
+                                        $this->form_fields = array_merge( $this->form_fields, array(
+                                                "subscription_wc_memberships_$status" => array(
+                                                        'title'       => __( 'Subscription for ' . $status_label ),
+                                                        'type'        => 'subscription',
+                                                        'default'     => '',
+                                                        'description' => __( 'Customers will be added to the selected item when the membership becomes ' . $status_label ),
+                                               ),
+                                                )
+                                        );
+                                }
 			}
 
 		}
