@@ -489,6 +489,8 @@ class CKWC_Integration extends WC_Integration {
 		}// End if().
 	}
 
+//TODO: in both functions below, add logic to unsubscribe user from old status, if applicable
+
 	/**
 	 * @param $subscription
 	 * @param string $status_old
