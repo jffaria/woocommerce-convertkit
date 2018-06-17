@@ -523,7 +523,7 @@ class CKWC_Integration extends WC_Integration {
 
 			}
 
-			$subscriptions = array( $this->{"subscription_wc_subscriptions_$status_new" );
+			$subscriptions = array( $this->{"subscription_wc_subscriptions_$status_new"} );
 
 			$subscriptions = array_filter( array_unique( $subscriptions ) );
 
@@ -573,7 +573,7 @@ class CKWC_Integration extends WC_Integration {
 
 			}
 
-			$subscriptions = array( $this->{"subscription_wc_subscriptions_$status_new" );
+			$subscriptions = array( $this->{"subscription_wc_memberships_wcm-$status_new"} );
 
 			$subscriptions = array_filter( array_unique( $subscriptions ) );
 
