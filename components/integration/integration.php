@@ -23,7 +23,18 @@ class CKWC_Integration extends WC_Integration {
 		// API interaction
 		$this->api_key      = $this->get_option( 'api_key' );
 		$this->subscription = $this->get_option( 'subscription' );
-		// TODO: foreach subscription and membership status, get subscription_wc_*_* option
+		if( class_exists( 'WC_Subscriptions' ) ) {
+                	$statuses = wcs_get_subscription_statuses();
+                        foreach( $statuses as $status => $status_label ) {
+				$this->{"subscription_wc_subscriptions_$status"} = $this->get_option( "subscription_wc_subscriptions_$status"  );
+			}
+		}
+		if( class_exists( 'WC_Memberships' ) ) {
+                        $statuses = wc_memberships_get_user_membership_statuses();
+                        foreach( $statuses as $status => $status_array ) {
+				$this->{"subscription_wc_memberships_$status"} = $this->get_option( "subscription_wc_memberships_$status"  );
+			}
+		}
 
 		// Enabled and when it should take place
 		$this->enabled      = $this->get_option( 'enabled' );
@@ -53,15 +64,23 @@ class CKWC_Integration extends WC_Integration {
 			add_filter( 'woocommerce_checkout_fields', array( $this, 'add_opt_in_checkbox' ) );
 		}
 
-		if ( 'yes' === $this->enabled ) {
+		if ( 'yes' === $this->enabled || 'yes' === $this->enabled_wc_subscriptions || 'yes' === $this->enabled_wc_memberships ) {
 			add_action( 'woocommerce_checkout_update_order_meta',  array( $this, 'save_opt_in_checkbox' ) );
 			add_action( 'woocommerce_process_shop_order_meta', array( $this, 'save_opt_in_checkbox' ) );
+		}
 
+                if ( 'yes' === $this->enabled ) {
 			add_action( 'woocommerce_checkout_update_order_meta',  array( $this, 'order_status' ), 99999, 1 );
 			add_action( 'woocommerce_order_status_changed',        array( $this, 'order_status' ), 99999, 3 );
 		}
 
-		//TODO: Add if blocks to add actions for the 2 new enabled_wc_* options and split the if block above to show opt in if any is yesm but add actions for order status only if enabled is yes
+		if ( 'yes' === $this->enabled_wc_subscriptions ) {
+			add_action( 'woocommerce_subscription_status_updated', array( $this, 'subscription_status' ), 99999, 3 );
+		}
+
+                if ( 'yes' === $this->enabled_wc_memberships ) {
+                        add_action( 'wc_memberships_user_membership_status_changed', array( $this, 'membership_status' ), 99999, 3 );
+                }
 
 	}
 
@@ -469,7 +488,113 @@ class CKWC_Integration extends WC_Integration {
 			}
 		}// End if().
 	}
-//TODO: Add 2 new functions to be hooked into subscriptions and memberships status changes
+
+	/**
+	 * @param $subscription
+	 * @param string $status_old
+	 * @param string $status_new
+	 */
+	public function subscription_status( $subscription, $status_old, $status_new ) {
+		$api_key_correct = ! empty( $this->api_key );
+		$status_correct  = isset( $this->{"subscription_wc_subscriptions_$status_new"} );
+		$opt_in_correct  = 'yes' === get_post_meta( $order_id, 'ckwc_opt_in', 'no' );
+		if ( $api_key_correct && $status_correct && $opt_in_correct ) {
+			if ( version_compare( WC()->version, '3.0.0', '>=' ) ) {
+				$email = $subscription->get_billing_email();
+				$first_name  = $subscription->get_billing_first_name();
+				$last_name  = $subscription->get_billing_last_name();
+
+			} else {
+				$email = $subscription->billing_email;
+				$first_name  = $subscription->billing_first_name;
+				$last_name  = $subscription->billing_last_name;
+			}
+
+			switch ( $this->name_format ) {
+				case 'first':
+					$name  = $first_name;
+					break;
+				case 'last':
+					$name  = $last_name;
+					break;
+				default:
+					$name  = sprintf("%s %s", $first_name, $last_name);
+					break;
+
+			}
+
+			$subscriptions = array( $this->{"subscription_wc_subscriptions_$status_new" );
+
+			$subscriptions = array_filter( array_unique( $subscriptions ) );
+
+			foreach ( $subscriptions as $subscription ) {
+				$subscription_parts    = explode( ':', $subscription );
+				$subscription_type     = $subscription_parts[0];
+				$subscription_id       = $subscription_parts[1];
+				$subscription_function = "ckwc_convertkit_api_add_subscriber_to_{$subscription_type}";
+
+				if ( function_exists( $subscription_function ) ) {
+					$response = call_user_func( $subscription_function, $subscription_id, $email, $name );
+
+					$debug = $this->get_option( 'debug' );
+					if ( 'yes' === $debug ) {
+						$this->debug_log( 'API call: ' . $subscription_type . "\nResponse: \n" . print_r( $response, true ) );
+					}
+				}
+			}
+		}// End if().
+	}
+
+	/**
+	 * @param $membership
+	 * @param string $status_old
+	 * @param string $status_new
+	 */
+	public function membership_status( $membership, $status_old, $status_new ) {
+		$api_key_correct = ! empty( $this->api_key );
+		$status_correct  = isset( $this->{"subscription_wc_memberships_wcm-$status_new"} );
+		$opt_in_correct  = 'yes' === get_post_meta( $order_id, 'ckwc_opt_in', 'no' );
+		if ( $api_key_correct && $status_correct && $opt_in_correct ) {
+			$user = get_userdata( $membership->get_user_id() );
+			$email = $user->user_email;
+			$first_name = $user->first_name;
+			$last_name = $user->last_name;
+
+			switch ( $this->name_format ) {
+				case 'first':
+					$name  = $first_name;
+					break;
+				case 'last':
+					$name  = $last_name;
+					break;
+				default:
+					$name  = sprintf("%s %s", $first_name, $last_name);
+					break;
+
+			}
+
+			$subscriptions = array( $this->{"subscription_wc_subscriptions_$status_new" );
+
+			$subscriptions = array_filter( array_unique( $subscriptions ) );
+
+			foreach ( $subscriptions as $subscription ) {
+				$subscription_parts    = explode( ':', $subscription );
+				$subscription_type     = $subscription_parts[0];
+				$subscription_id       = $subscription_parts[1];
+				$subscription_function = "ckwc_convertkit_api_add_subscriber_to_{$subscription_type}";
+
+				if ( function_exists( $subscription_function ) ) {
+					$response = call_user_func( $subscription_function, $subscription_id, $email, $name );
+
+					$debug = $this->get_option( 'debug' );
+					if ( 'yes' === $debug ) {
+						$this->debug_log( 'API call: ' . $subscription_type . "\nResponse: \n" . print_r( $response, true ) );
+					}
+				}
+			}
+		}// End if().
+	}
+
 	/**
 	 * Write API request results to a debug log
 	 * @param $message
