@@ -22,6 +22,7 @@ class CKWC_Integration extends WC_Integration {
 
 		// API interaction
 		$this->api_key      = $this->get_option( 'api_key' );
+		$this->api_secret   = $this->get_option( 'api_secret' );
 		$this->subscription = $this->get_option( 'subscription' );
 		if( class_exists( 'WC_Subscriptions' ) ) {
                 	$statuses = wcs_get_subscription_statuses();
@@ -79,7 +80,7 @@ class CKWC_Integration extends WC_Integration {
 		}
 
                 if ( 'yes' === $this->enabled_wc_memberships ) {
-                        add_action( 'wc_memberships_user_membership_status_changed', array( $this, 'membership_status' ), 99999, 3 );
+                        add_action( 'wc_memberships_user_membership_status_changed', array( $this, 'membership_status' ), 10, 3 );
                 }
 
 	}
@@ -257,6 +258,15 @@ class CKWC_Integration extends WC_Integration {
 					'default'     => '',
 					// translators: this is a url to the ConvertKit site.
 					'description' => sprintf( __( 'If you already have an account, <a href="%1$s" target="_blank">click here to retrieve your API Key</a>.<br />If you don\'t have a ConvertKit account, you can <a href="%2$s" target="_blank">sign up for one here</a>.' ), esc_attr( esc_html( 'https://app.convertkit.com/account/edit' ) ), esc_attr( esc_url( 'http://convertkit.com/pricing/' ) ) ),
+					'desc_tip'    => false,
+				),
+
+				'api_secret' => array(
+					'title'       => __( 'API Secret' ),
+					'type'        => 'text',
+					'default'     => '',
+					// translators: this is a url to the ConvertKit site.
+					'description' => sprintf( __( 'If you already have an account, <a href="%1$s" target="_blank">click here to retrieve your API Secret</a>.<br />If you don\'t have a ConvertKit account, you can <a href="%2$s" target="_blank">sign up for one here</a>.' ), esc_attr( esc_html( 'https://app.convertkit.com/account/edit' ) ), esc_attr( esc_url( 'http://convertkit.com/pricing/' ) ) ),
 					'desc_tip'    => false,
 				),
 
@@ -493,23 +503,26 @@ class CKWC_Integration extends WC_Integration {
 
 	/**
 	 * @param $subscription
-	 * @param string $status_old
 	 * @param string $status_new
+	 * @param string $status_old
 	 */
-	public function subscription_status( $subscription, $status_old, $status_new ) {
+	public function subscription_status( $wc_subscription, $status_new, $status_old ) {
+		$this->debug_log( 'subscription_status: $wc_subscription = ' . $wc_subscription->id . ' $status_new = ' . $status_new . ' $status_old = ' . $status_old );
 		$api_key_correct = ! empty( $this->api_key );
-		$status_correct  = isset( $this->{"subscription_wc_subscriptions_$status_new"} );
-		$opt_in_correct  = 'yes' === get_post_meta( $order_id, 'ckwc_opt_in', 'no' );
+		$status_correct  = isset( $this->{"subscription_wc_subscriptions_wc-$status_new"} );
+		$this->debug_log( '$this->{"subscription_wc_subscriptions_wc-$status_new"} = ' . $this->{"subscription_wc_subscriptions_wc-$status_new"} );
+		$opt_in_correct  = 'yes' === get_post_meta( $wc_subscription->get_parent()->get_id(), 'ckwc_opt_in', 'no' );
+		$this->debug_log ('$api_key_correct && $status_correct && $opt_in_correct : '. $api_key_correct . ' ' . $status_correct .' ' . $opt_in_correct );
 		if ( $api_key_correct && $status_correct && $opt_in_correct ) {
 			if ( version_compare( WC()->version, '3.0.0', '>=' ) ) {
-				$email = $subscription->get_billing_email();
-				$first_name  = $subscription->get_billing_first_name();
-				$last_name  = $subscription->get_billing_last_name();
+				$email = $wc_subscription->get_billing_email();
+				$first_name  = $wc_subscription->get_billing_first_name();
+				$last_name  = $wc_subscription->get_billing_last_name();
 
 			} else {
-				$email = $subscription->billing_email;
-				$first_name  = $subscription->billing_first_name;
-				$last_name  = $subscription->billing_last_name;
+				$email = $wc_subscription->billing_email;
+				$first_name  = $wc_subscription->billing_first_name;
+				$last_name  = $wc_subscription->billing_last_name;
 			}
 
 			switch ( $this->name_format ) {
@@ -524,11 +537,11 @@ class CKWC_Integration extends WC_Integration {
 					break;
 
 			}
-
-			$subscriptions = array( $this->{"subscription_wc_subscriptions_$status_new"} );
+			$this->debug_log('$name = ' . $name);
+			$subscriptions = array( $this->{"subscription_wc_subscriptions_wc-$status_new"} );
 
 			$subscriptions = array_filter( array_unique( $subscriptions ) );
-
+			$this->debug_log( 'subscriptions: ' . print_r($subscriptions, true) );
 			foreach ( $subscriptions as $subscription ) {
 				$subscription_parts    = explode( ':', $subscription );
 				$subscription_type     = $subscription_parts[0];
@@ -544,6 +557,21 @@ class CKWC_Integration extends WC_Integration {
 					}
 				}
 			}
+	
+			$subscription = $this->{"subscription_wc_subscriptions_wc-$status_old"};
+			$subscription_parts = explode( ':', $subscription );
+			$subscription_type     = $subscription_parts[0];
+			$subscription_id       = $subscription_parts[1];
+			$subscription_function = "ckwc_convertkit_api_remove_subscriber_from_{$subscription_type}";
+			
+			if ( function_exists( $subscription_function ) ) {
+				$response = call_user_func( $subscription_function, $subscription_id, $email, $name );
+
+				$debug = $this->get_option( 'debug' );
+				if ( 'yes' === $debug ) {
+					$this->debug_log( 'API call: ' . $subscription_type . "\nResponse: \n" . print_r( $response, true ) );
+				}
+			}
 		}// End if().
 	}
 
@@ -553,9 +581,10 @@ class CKWC_Integration extends WC_Integration {
 	 * @param string $status_new
 	 */
 	public function membership_status( $membership, $status_old, $status_new ) {
+		$this->debug_log( 'membership_status: $membership = ' . $membership->id . ' $status_old = ' . $status_old . ' $status_new = ' . $status_new );
 		$api_key_correct = ! empty( $this->api_key );
 		$status_correct  = isset( $this->{"subscription_wc_memberships_wcm-$status_new"} );
-		$opt_in_correct  = 'yes' === get_post_meta( $order_id, 'ckwc_opt_in', 'no' );
+		$opt_in_correct  = 'yes' === get_post_meta( $membership->get_order_id(), 'ckwc_opt_in', 'no' );
 		if ( $api_key_correct && $status_correct && $opt_in_correct ) {
 			$user = get_userdata( $membership->get_user_id() );
 			$email = $user->user_email;
@@ -592,6 +621,21 @@ class CKWC_Integration extends WC_Integration {
 					if ( 'yes' === $debug ) {
 						$this->debug_log( 'API call: ' . $subscription_type . "\nResponse: \n" . print_r( $response, true ) );
 					}
+				}
+			}
+			
+			$subscription = $this->{"subscription_wc_subscriptions_wcm-$status_old"};
+			$subscription_parts = explode( ':', $subscription );
+			$subscription_type     = $subscription_parts[0];
+			$subscription_id       = $subscription_parts[1];
+			$subscription_function = "ckwc_convertkit_api_remove_subscriber_from_{$subscription_type}";
+			
+			if ( function_exists( $subscription_function ) ) {
+				$response = call_user_func( $subscription_function, $subscription_id, $email, $name );
+
+				$debug = $this->get_option( 'debug' );
+				if ( 'yes' === $debug ) {
+					$this->debug_log( 'API call: ' . $subscription_type . "\nResponse: \n" . print_r( $response, true ) );
 				}
 			}
 		}// End if().

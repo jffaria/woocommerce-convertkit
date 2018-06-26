@@ -23,8 +23,12 @@ function ckwc_convertkit_api_request( $path, $query_args = array(), $request_bod
 		'timeout' => 5,
 	), $request_args);
 
-	if ( ! isset( $query_args['api_key'] ) ) {
+	if ( ! isset( $query_args['api_key'] ) && strpos( $path, 'unsubscribe' ) === false ) {
 		$query_args['api_key'] = ckwc_instance()->api_key;
+	}
+	
+	if ( ! isset( $query_args['api_secret'] ) && strpos( $path, 'unsubscribe' ) !== false ) {
+		$query_args['api_secret'] = ckwc_instance()->api_secret;
 	}
 
 	$request_url = add_query_arg( $query_args, $request_url );
@@ -87,6 +91,29 @@ function ckwc_convertkit_api_get_tags( $api_key = null ) {
 
 	return is_wp_error( $response ) ? $response : (isset( $response['tags'] ) ? array_combine( wp_list_pluck( $response['tags'], 'id' ), $response['tags'] ) : array());
 }
+
+
+/**
+ * @param string $tag
+ * @param string $email
+ * @param string $name
+ * @param string|null $api_secret
+ *
+ * @return array|mixed|object|WP_Error
+ */
+function ckwc_convertkit_api_remove_subscriber_from_tag( $tag, $email, $name, $api_secret = null ) {
+	$query_args = is_null( $api_secret ) ? array() : array(
+		'api_secret' => $api_secret,
+	);
+
+	return ckwc_convertkit_api_request(sprintf( 'tags/%d/unsubscribe', $tag ), $query_args, array(
+		'email' => $email,
+		), array(
+		'method' => 'POST',
+	));
+}
+
+
 
 /**
  * @param string $course
