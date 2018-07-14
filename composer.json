@@ -1,0 +1,10 @@
+{
+    "name": "jffaria/woocommerce-convertkit",
+    "type": "wordpress-plugin",
+    "extra": {
+        "installer-name": "convertkit-for-woocommerce"
+    },
+    "require": {
+        "composer/installers": "~1.0"
+    }
+}
